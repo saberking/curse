@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string>
 #include<string.h>
+#include <list>
 #define noOfRooms 1
 #define BUFF_LENGTH 100
 using namespace std;
@@ -19,22 +20,35 @@ class Obj{
         weight=_weight;
     }
 };
+class Light: public Obj{
+    public:
+    bool powered;
+    Light():Obj{"light","provides (some) illumination", }, powered{true}{
+    }
+};
 //comment
 const char *inspectMessage="What would you like to inspect?\n";
 const char *pickUpMessage="What would you like to pick up?\n";
-struct room{
-    const char *text;
-    struct obj *objects;
+class Room{
+    public:
+    string text;
+    list<Obj> objects;
     bool visited;
 };
-const char *rooms[noOfRooms]={
-    "You find yourself in a small, dimly-lit room. The walls, ceiling and floor are made of metal. \
-    \nAround you are heaps of crumpled magazines and dusty circuit boards.\nThere is a metal door at one side of the room.\n\
-    What would you like to do?\n\
-    [i]nspect something\n\
-    [p]ick something up\n"
-};
+Room startingRoom;
+const char *actionList="    [i]nspect something\n\
+    [p]ick something up\n";
 
+void initRooms(){
+    string startingText("You find yourself in a small, dimly-lit room. The walls, ceiling and floor are made of metal. \
+    \nAround you are heaps of crumpled magazines and dusty circuit boards.\nThere is a metal door at one side of the room.\n\
+    What would you like to do?\n");
+    startingRoom.text=startingText;
+    Obj *objects;
+    Light l1;
+    startingRoom.objects.push_back(l1);
+
+}
 char *input(int length=BUFF_LENGTH){
     char *buff = (char*)malloc(length);
     echo();
@@ -42,14 +56,10 @@ char *input(int length=BUFF_LENGTH){
         noecho();
     return buff;
 }
-int main(){
-    Obj light("light", "provides (some) illumination");
-     char c;
-    initscr();
-    cbreak();
-    noecho();
-    nodelay(stdscr,FALSE);
-    mvaddstr(0,0,rooms[0]);
+void roomInfo(Room &room){
+    mvaddstr(0,0,room.text.c_str());
+    addstr(actionList);
+    char c;
     do{
         c=getch();
     }while (c!='i' &&c!='p');
@@ -61,10 +71,20 @@ int main(){
             addstr(pickUpMessage);
             break;
     }
-    char *buff=input();
-    if(strstr(buff, "light")){
-        addstr(light.desc.c_str());
+    string buff=input();
+    for(std::list<Obj>::const_iterator i=room.objects.begin(),end=room.objects.end();i!=end;++i){
+        if(buff.find(i->name)!=-1)
+            addstr(i->desc.c_str());
     }
+}
+int main(){
+     char c;
+    initscr();
+    cbreak();
+    noecho();
+    nodelay(stdscr,FALSE);
+initRooms();
+    roomInfo(startingRoom);
     getch();
 
     endwin();
