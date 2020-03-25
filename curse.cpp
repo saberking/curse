@@ -7,6 +7,7 @@ struct obj{
     char *desc;
     int weight;
 };
+//comment
 
 struct room{
     const char *text;
