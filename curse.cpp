@@ -2,90 +2,211 @@
 #include <stdlib.h>
 #include <string>
 #include<string.h>
-#include <list>
+#include <vector>
+#include<iostream>
+
 #define noOfRooms 1
 #define BUFF_LENGTH 100
 using namespace std;
+bool quit=FALSE;
+WINDOW *wroom, *wobj, *wlog;
 
+class ObjAction{
+    public:
+    string name;
+    char command;
+    ObjAction(string _name):name{_name}{command=_name.c_str()[0];};
+};
+
+ObjAction open("open");
 class Obj{
     public:
     string name;
     string desc;
-    bool fixed;
-    int weight;
-    Obj(string _name, string _desc, bool _fixed=true, int _weight=1){
+    vector<ObjAction*> actions;
+    virtual void applyAction(char command){};
+
+    Obj(string _name, string _desc, vector<ObjAction*> const &_actions=vector<ObjAction*>()){
         name=_name;
         desc=_desc;
-        fixed=_fixed;
-        weight=_weight;
-    }
+        actions=_actions;
+    };
 };
+
+Obj *selectedObject=NULL;
 class Light: public Obj{
     public:
     bool powered;
     Light():Obj{"light","provides (some) illumination", }, powered{true}{
     }
 };
+class Wall:public Obj{
+    Wall():Obj{"wall","hard and metallic"}{}
+
+};
+class Ceiling:public Obj{
+    Ceiling():Obj{"ceiling","you can almost reach it"}{}
+};
+class Floor:public Obj{
+    Floor():Obj{"floor","it is what you are standing on"}{}
+};
+
+class Door:public Obj{
+    public:
+    bool locked;
+    void applyAction(char command){
+        if(command=='o'){
+            if(locked)waddstr(wlog,"To your dismay, the door seems to be locked\n");
+            else waddstr(wlog,"You open the door. Unfortunately, what is behind it does not seem interesting\n");
+        }
+    }
+    Door():Obj{"door","keeps the bad guys out"}, locked{true}{actions.push_back(&open);};
+
+};
+
 //comment
+
 const char *inspectMessage="What would you like to inspect?\n";
 const char *pickUpMessage="What would you like to pick up?\n";
 class Room{
     public:
     string text;
-    list<Obj> objects;
+    vector<Obj*> objects;
     bool visited;
 };
 Room startingRoom;
-const char *actionList="    [i]nspect something\n\
-    [p]ick something up\n";
+Door d1;
+Light l1;
+const char *actionList="    [i]nspect something\n    [p]ick something up\n";
 
 void initRooms(){
-    string startingText("You find yourself in a small, dimly-lit room. The walls, ceiling and floor are made of metal. \
+    string startingText("You find yourself in a small, dimly-lit room. \nThe walls, ceiling and floor are made of metal. \
     \nAround you are heaps of crumpled magazines and dusty circuit boards.\nThere is a metal door at one side of the room.\n\
     What would you like to do?\n");
     startingRoom.text=startingText;
-    Obj *objects;
-    Light l1;
-    startingRoom.objects.push_back(l1);
+    startingRoom.objects.push_back(&l1);
+    startingRoom.objects.push_back(&d1);
+}
+
+void initCurses(){
+    initscr();
+    cbreak();
+    refresh();
+    noecho();
+    wroom=newwin(8, 80, 1, 1);
+    wobj=newwin(8, 30, 1, 85);
+    wlog=newwin(12,110,10,1);
+    nodelay(stdscr,FALSE);
+    keypad(stdscr, TRUE);
+    wmove(wlog,0,0);
+    refresh();
+
 
 }
+void drawBoxes(){
+    box(wroom,0,0);
+    box(wobj,0,0);
+    box(wlog,0,0);
+    wrefresh(wlog);
+    wrefresh(wroom);
+    wrefresh(wobj);
+}
 char *input(int length=BUFF_LENGTH){
-    char *buff = (char*)malloc(length);
     echo();
-        wgetnstr(stdscr, buff, length-1);
+    char *buff = (char*)malloc(length);
+        wgetnstr(wlog, buff, length-1);
         noecho();
     return buff;
 }
 void roomInfo(Room &room){
-    mvaddstr(0,0,room.text.c_str());
-    addstr(actionList);
-    char c;
+    wclear(wroom);
+        // box(wroom,0,0);
+
+    waddstr(wroom, room.text.c_str());
+    room.visited=true;
+    waddstr(wroom,actionList);
+    wrefresh(wroom);
+}
+void objInfo(Obj &obj){
+    wclear(wobj);
+        // box(wobj,0,0);
+
+        wprintw(wobj,"%s\n%s\n",obj.name.c_str(),obj.desc.c_str());
+        for(vector<ObjAction*>::const_iterator i=obj.actions.begin(),end=obj.actions.end();i!=end;++i){
+            const char *cstr=(**i).name.c_str();
+            char str[100];
+            // strcpy(str,"foo");
+            sprintf(str, "    [%c]%s %s\n", cstr[0], cstr+1, obj.name.c_str());
+            waddstr(wobj,str);
+        }
+    wrefresh(wobj);
+}
+Obj* getObjByName(string name){
+    for(std::vector<Obj *>::iterator i=startingRoom.objects.begin(),end=startingRoom.objects.end();i!=end;++i){
+        if(name.find((**i).name)!=-1)return *i;
+    }
+    return NULL;
+}
+Obj *selectObj(){
+    Obj *obj=NULL;
     do{
-        c=getch();
-    }while (c!='i' &&c!='p');
+        string buff=input();
+        obj=getObjByName(buff);
+    }while(obj==NULL);
+    return obj;
+}
+void inspect(){
+    waddstr(wlog,inspectMessage);
+    selectedObject=selectObj();
+    objInfo(*selectedObject);
+}
+void pickUp(){
+    waddstr(wlog,pickUpMessage);
+    selectObj();
+    waddstr(wlog,"it is too heavy\n");
+}
+
+void logInfo(){
+        // box(wlog,0,0);
+
+    char availableCommands[30];
+    availableCommands[29]='\0';
+    availableCommands[0]='i';availableCommands[1]='p';availableCommands[2]='q';
+    int index=3;
+    if(selectedObject!=NULL){
+        for(vector<ObjAction*>::const_iterator i=selectedObject->actions.begin(),end=selectedObject->actions.end();i!=end;++i){
+            availableCommands[index++]=(*i)->command;
+        }
+    }
+    char c=';';
+    do{
+        c=wgetch(wlog);
+    }while (strchr(availableCommands, c)==NULL);
+        wclear(wlog);
+
     switch(c){
         case 'i':
-            addstr(inspectMessage);
+            inspect();
             break;
         case 'p':
-            addstr(pickUpMessage);
+            pickUp();
             break;
+        case 'q': quit=true;
+        break;
+        default:   
+        selectedObject->applyAction(c);
+                    break;
+
     }
-    string buff=input();
-    for(std::list<Obj>::const_iterator i=room.objects.begin(),end=room.objects.end();i!=end;++i){
-        if(buff.find(i->name)!=-1)
-            addstr(i->desc.c_str());
-    }
+    wrefresh(wlog);
 }
 int main(){
-     char c;
-    initscr();
-    cbreak();
-    noecho();
-    nodelay(stdscr,FALSE);
-initRooms();
+    initRooms();
+        initCurses();
     roomInfo(startingRoom);
-    getch();
+    while(quit==FALSE){
+        logInfo();
+    }
 
     endwin();
 }
