@@ -9,7 +9,7 @@
 #define BUFF_LENGTH 100
 using namespace std;
 bool quit=FALSE;
-WINDOW *wroom, *wobj, *wlog;
+WINDOW *wroom,  *wlog;
 
 class ObjAction{
     public:
@@ -77,12 +77,11 @@ class Room{
 Room startingRoom;
 Door d1;
 Light l1;
-const char *actionList="    [i]nspect something\n    [p]ick something up\n";
+const char *actionList="What would you like to do?\n  [i]nspect something\n  [p]ick something up\n";
 
 void initRooms(){
     string startingText("You find yourself in a small, dimly-lit room. \nThe walls, ceiling and floor are made of metal. \
-    \nAround you are heaps of crumpled magazines and dusty circuit boards.\nThere is a metal door at one side of the room.\n\
-    What would you like to do?\n");
+    \nAround you are heaps of crumpled magazines and dusty circuit boards.\nThere is a metal door at one side of the room.");
     startingRoom.text=startingText;
     startingRoom.objects.push_back(&l1);
     startingRoom.objects.push_back(&d1);
@@ -93,8 +92,7 @@ void initCurses(){
     cbreak();
     refresh();
     noecho();
-    wroom=newwin(8, 80, 1, 1);
-    wobj=newwin(8, 30, 1, 85);
+    wroom=newwin(8, 110, 1, 1);
     wlog=newwin(12,110,10,1);
     nodelay(stdscr,FALSE);
     keypad(stdscr, TRUE);
@@ -103,14 +101,7 @@ void initCurses(){
 
 
 }
-void drawBoxes(){
-    box(wroom,0,0);
-    box(wobj,0,0);
-    box(wlog,0,0);
-    wrefresh(wlog);
-    wrefresh(wroom);
-    wrefresh(wobj);
-}
+
 char *input(int length=BUFF_LENGTH){
     echo();
     char *buff = (char*)malloc(length);
@@ -124,22 +115,14 @@ void roomInfo(Room &room){
 
     waddstr(wroom, room.text.c_str());
     room.visited=true;
-    waddstr(wroom,actionList);
     wrefresh(wroom);
 }
 void objInfo(Obj &obj){
-    wclear(wobj);
-        // box(wobj,0,0);
 
-        wprintw(wobj,"%s\n%s\n",obj.name.c_str(),obj.desc.c_str());
-        for(vector<ObjAction*>::const_iterator i=obj.actions.begin(),end=obj.actions.end();i!=end;++i){
-            const char *cstr=(**i).name.c_str();
-            char str[100];
-            // strcpy(str,"foo");
-            sprintf(str, "    [%c]%s %s\n", cstr[0], cstr+1, obj.name.c_str());
-            waddstr(wobj,str);
-        }
-    wrefresh(wobj);
+
+        wprintw(wlog,"%s\n",obj.desc.c_str());
+
+    wrefresh(wlog);
 }
 Obj* getObjByName(string name){
     for(std::vector<Obj *>::iterator i=startingRoom.objects.begin(),end=startingRoom.objects.end();i!=end;++i){
@@ -173,11 +156,18 @@ void logInfo(){
     availableCommands[29]='\0';
     availableCommands[0]='i';availableCommands[1]='p';availableCommands[2]='q';
     int index=3;
+            waddstr(wlog,actionList);
+
     if(selectedObject!=NULL){
         for(vector<ObjAction*>::const_iterator i=selectedObject->actions.begin(),end=selectedObject->actions.end();i!=end;++i){
             availableCommands[index++]=(*i)->command;
+                        const char *cstr=(**i).name.c_str();
+            char str[100];
+            sprintf(str, "  [%c]%s %s\n", cstr[0], cstr+1, selectedObject->name.c_str());
+            waddstr(wlog,str);
         }
     }
+    wrefresh(wlog);
     char c=';';
     do{
         c=wgetch(wlog);
