@@ -44,7 +44,7 @@ struct Room{
         visited=false;
     }
 };
-Room *startingRoom;
+Room *startingRoom, *currentRoom, *passage;
 
 
 Obj *selectedObject=NULL;
@@ -73,12 +73,31 @@ struct Door:public Obj{
         if(command=='o'){
             if(locked)waddstr(wlog,"To your dismay, the door seems to be locked\n");
             else waddstr(wlog,"You open the door. Unfortunately, what is behind it does not seem interesting\n");
+            wrefresh(wlog);
         }
     }
     Door():Obj{"door","keeps the bad guys out"}, locked{true}{actions.push_back(new ObjAction("open"));};
 
 };
-Obj duct{"duct","just wide enough to crawl through", new vector<ObjAction *>{new ObjAction{"crawl"}}};
+struct Duct:Obj {
+    Duct():Obj{"duct","just wide enough to crawl through", new vector<ObjAction *>{new ObjAction{"crawl"}}}{};
+    void applyAction(char command){
+        if(command=='c'){
+            currentRoom=passage;
+            wclear(wroom);
+            wrefresh(wroom);
+            waddstr(wlog,"You crawl into the duct and start moving along\
+            \nIt is pitch dark but you can see a faint glimmer in the distance.\
+            \nSoon you reach the the end, which is also covered by a panel.\
+            \nYou punch the panel loose and climb out.\n");
+            wrefresh(wlog);
+            wgetch(wlog);
+            wclear(wlog);
+            wrefresh(wlog);
+        }
+    };
+};
+Duct duct;
 struct RemovablePanel: Obj{
     RemovablePanel():Obj{"panel","It looks like you could easily remove this", new vector<ObjAction*>{new ObjAction("remove")}}{
     
@@ -109,6 +128,11 @@ void initRooms(){
         &panel
         };
     startingRoom=new Room(startingText, *objects);
+    currentRoom=startingRoom;
+    vector<Obj *> *pobjects=new vector<Obj *>{
+        new Wall, new Light, new Ceiling, new Floor
+    };
+    passage=new Room("You emerge into a wide corridor similar to the previous room", *pobjects);
 }
 
 void initCurses(){
@@ -149,7 +173,7 @@ void objInfo(Obj &obj){
     wrefresh(wlog);
 }
 Obj* getObjByName(string name){
-    for(std::vector<Obj *>::iterator i=startingRoom->objects.begin(),end=startingRoom->objects.end();i!=end;++i){
+    for(std::vector<Obj *>::iterator i=currentRoom->objects.begin(),end=currentRoom->objects.end();i!=end;++i){
         if(name.find((**i).name)!=-1)return *i;
     }
     return NULL;
@@ -218,8 +242,9 @@ void logInfo(){
 int main(){
     initRooms();
         initCurses();
-    roomInfo(startingRoom);
     while(quit==FALSE){
+            roomInfo(currentRoom);
+
         logInfo();
     }
 
