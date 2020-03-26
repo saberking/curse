@@ -3,6 +3,7 @@
 #include <string>
 #include<string.h>
 #include <vector>
+#include<list>
 #include<iostream>
 
 #define noOfRooms 1
@@ -19,9 +20,9 @@ struct ObjAction{
 };
 
 struct Obj{
-    public:
     string name;
     string desc;
+    bool item;
     vector<ObjAction*> actions;
     // vector<Obj *>hiddenObjects;
     virtual void applyAction(char command){};
@@ -29,6 +30,7 @@ struct Obj{
     Obj(string _name, string _desc, vector<ObjAction*> *_actions=NULL){
         name=_name;
         desc=_desc;
+        item=FALSE;
         if(_actions==NULL)actions=*(new vector<ObjAction*>);
         else actions=*_actions;
         // hiddenObjects=_hiddenObjects;
@@ -38,16 +40,23 @@ struct Obj{
 struct Room{
     public:
     string text;
-    vector<Obj*> objects;
+    list<Obj*> objects;
     bool visited;
-    Room(string _text,vector<Obj *>_objects):text{_text},objects{_objects}{
+    Room(string _text,list<Obj *>_objects):text{_text},objects{_objects}{
         visited=false;
     }
 };
 Room *startingRoom, *currentRoom, *passage;
 
-
 Obj *selectedObject=NULL;
+struct Item:Obj{
+    int weight;
+    Item(string _name, string _desc, vector<ObjAction*> *_actions=NULL, int _weight=1):Obj{_name,_desc,_actions}{
+    weight=_weight;
+    item=TRUE;
+    }
+};
+list<Item*> inventory;
 struct Light: public Obj{
     public:
     bool powered;
@@ -90,6 +99,7 @@ struct Duct:Obj {
             \nIt is pitch dark but you can see a faint glimmer in the distance.\
             \nSoon you reach the the end, which is also covered by a panel.\
             \nYou punch the panel loose and climb out.\n");
+            selectedObject=NULL;
             wrefresh(wlog);
             wgetch(wlog);
             wclear(wlog);
@@ -122,14 +132,16 @@ const char *actionList="What would you like to do?\n  [i]nspect something\n  [p]
 void initRooms(){
     string startingText("You find yourself in a small, dimly-lit room. \nThe walls, ceiling and floor are made of metal. \
     \nAround you are heaps of crumpled magazines and dusty circuit boards.\nThere is a metal door at one side of the room.");
-    vector<Obj *> *objects=new vector<Obj *>{
+    list<Obj *> *objects=new list<Obj *>{
         new Light, new Door, new Ceiling, new Floor, 
         new Obj("wall", "As you examine the wall, you notice a loose ventilation panel held in by a single screw"),
-        &panel
+        &panel,
+        new Item("magazine", "the magazines are mostly centred on fashion tips for various species"),
+        new Item("circuit board", "even without specialist knowledge, you can tell that these will not work")
         };
     startingRoom=new Room(startingText, *objects);
     currentRoom=startingRoom;
-    vector<Obj *> *pobjects=new vector<Obj *>{
+    list<Obj *> *pobjects=new list<Obj *>{
         new Wall, new Light, new Ceiling, new Floor
     };
     passage=new Room("You emerge into a wide corridor similar to the previous room", *pobjects);
@@ -173,7 +185,7 @@ void objInfo(Obj &obj){
     wrefresh(wlog);
 }
 Obj* getObjByName(string name){
-    for(std::vector<Obj *>::iterator i=currentRoom->objects.begin(),end=currentRoom->objects.end();i!=end;++i){
+    for(std::list<Obj *>::iterator i=currentRoom->objects.begin(),end=currentRoom->objects.end();i!=end;++i){
         if(name.find((**i).name)!=-1)return *i;
     }
     return NULL;
@@ -194,7 +206,12 @@ void inspect(){
 }
 void pickUp(){
     waddstr(wlog,pickUpMessage);
-    selectObj();
+    Obj *obj=selectObj();
+    if(obj->item){
+        wprintw(wlog, "You pick up the %s\n",obj->name.c_str());
+        inventory.push_back((Item*)obj);
+        currentRoom->objects.remove(obj);
+    }else
     waddstr(wlog,"it is too heavy\n");
 }
 
