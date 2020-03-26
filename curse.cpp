@@ -118,6 +118,7 @@ struct RemovablePanel: Obj{
             desc="lying on the floor";
             actions=*(new vector<ObjAction*>);
             waddstr(wlog,"You remove the panel. Behind it is a ventilation duct\n");
+            selectedObject=&duct;
         }
     }
 };
