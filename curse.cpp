@@ -11,47 +11,62 @@ using namespace std;
 bool quit=FALSE;
 WINDOW *wroom,  *wlog;
 
-class ObjAction{
+struct ObjAction{
     public:
     string name;
     char command;
     ObjAction(string _name):name{_name}{command=_name.c_str()[0];};
 };
 
-ObjAction open("open");
-class Obj{
+struct Obj{
     public:
     string name;
     string desc;
     vector<ObjAction*> actions;
+    // vector<Obj *>hiddenObjects;
     virtual void applyAction(char command){};
 
-    Obj(string _name, string _desc, vector<ObjAction*> const &_actions=vector<ObjAction*>()){
+    Obj(string _name, string _desc, vector<ObjAction*> *_actions=NULL){
         name=_name;
         desc=_desc;
-        actions=_actions;
+        if(_actions==NULL)actions=*(new vector<ObjAction*>);
+        else actions=*_actions;
+        // hiddenObjects=_hiddenObjects;
     };
 };
 
+struct Room{
+    public:
+    string text;
+    vector<Obj*> objects;
+    bool visited;
+    Room(string _text,vector<Obj *>_objects):text{_text},objects{_objects}{
+        visited=false;
+    }
+};
+Room *startingRoom;
+
+
 Obj *selectedObject=NULL;
-class Light: public Obj{
+struct Light: public Obj{
     public:
     bool powered;
     Light():Obj{"light","provides (some) illumination", }, powered{true}{
     }
 };
-class Wall:public Obj{
+struct Wall:public Obj{
     Wall():Obj{"wall","hard and metallic"}{}
 
 };
-class Ceiling:public Obj{
+
+struct Ceiling:public Obj{
     Ceiling():Obj{"ceiling","you can almost reach it"}{}
 };
-class Floor:public Obj{
+struct Floor:public Obj{
     Floor():Obj{"floor","it is what you are standing on"}{}
 };
 
-class Door:public Obj{
+struct Door:public Obj{
     public:
     bool locked;
     void applyAction(char command){
@@ -60,31 +75,40 @@ class Door:public Obj{
             else waddstr(wlog,"You open the door. Unfortunately, what is behind it does not seem interesting\n");
         }
     }
-    Door():Obj{"door","keeps the bad guys out"}, locked{true}{actions.push_back(&open);};
+    Door():Obj{"door","keeps the bad guys out"}, locked{true}{actions.push_back(new ObjAction("open"));};
 
 };
-
+Obj duct{"duct","just wide enough to crawl through", new vector<ObjAction *>{new ObjAction{"crawl"}}};
+struct RemovablePanel: Obj{
+    RemovablePanel():Obj{"panel","It looks like you could easily remove this", new vector<ObjAction*>{new ObjAction("remove")}}{
+    
+    };
+    void applyAction(char command){
+        if(command=='r'){
+            startingRoom->objects.push_back(&duct);
+            desc="lying on the floor";
+            actions=*(new vector<ObjAction*>);
+            waddstr(wlog,"You remove the panel. Behind it is a ventilation duct\n");
+        }
+    }
+};
+RemovablePanel panel;
 //comment
 
 const char *inspectMessage="What would you like to inspect?\n";
 const char *pickUpMessage="What would you like to pick up?\n";
-class Room{
-    public:
-    string text;
-    vector<Obj*> objects;
-    bool visited;
-};
-Room startingRoom;
-Door d1;
-Light l1;
+
 const char *actionList="What would you like to do?\n  [i]nspect something\n  [p]ick something up\n";
 
 void initRooms(){
     string startingText("You find yourself in a small, dimly-lit room. \nThe walls, ceiling and floor are made of metal. \
     \nAround you are heaps of crumpled magazines and dusty circuit boards.\nThere is a metal door at one side of the room.");
-    startingRoom.text=startingText;
-    startingRoom.objects.push_back(&l1);
-    startingRoom.objects.push_back(&d1);
+    vector<Obj *> *objects=new vector<Obj *>{
+        new Light, new Door, new Ceiling, new Floor, 
+        new Obj("wall", "As you examine the wall, you notice a loose ventilation panel held in by a single screw"),
+        &panel
+        };
+    startingRoom=new Room(startingText, *objects);
 }
 
 void initCurses(){
@@ -102,19 +126,19 @@ void initCurses(){
 
 }
 
-char *input(int length=BUFF_LENGTH){
+char *input(){
     echo();
-    char *buff = (char*)malloc(length);
-        wgetnstr(wlog, buff, length-1);
+    char *buff=(char*)malloc(BUFF_LENGTH);
+        wgetnstr(wlog, buff, BUFF_LENGTH-1);
         noecho();
     return buff;
 }
-void roomInfo(Room &room){
+void roomInfo(Room *room){
     wclear(wroom);
         // box(wroom,0,0);
 
-    waddstr(wroom, room.text.c_str());
-    room.visited=true;
+    waddstr(wroom, room->text.c_str());
+    room->visited=true;
     wrefresh(wroom);
 }
 void objInfo(Obj &obj){
@@ -125,7 +149,7 @@ void objInfo(Obj &obj){
     wrefresh(wlog);
 }
 Obj* getObjByName(string name){
-    for(std::vector<Obj *>::iterator i=startingRoom.objects.begin(),end=startingRoom.objects.end();i!=end;++i){
+    for(std::vector<Obj *>::iterator i=startingRoom->objects.begin(),end=startingRoom->objects.end();i!=end;++i){
         if(name.find((**i).name)!=-1)return *i;
     }
     return NULL;
@@ -133,8 +157,9 @@ Obj* getObjByName(string name){
 Obj *selectObj(){
     Obj *obj=NULL;
     do{
-        string buff=input();
+        char * buff=input();
         obj=getObjByName(buff);
+        free(buff);
     }while(obj==NULL);
     return obj;
 }
