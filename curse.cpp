@@ -1,4 +1,4 @@
-#include <PDCurses-3.8/curses.h>
+#include <curses.h>
 #include <stdlib.h>
 #include <string>
 #include<string.h>
