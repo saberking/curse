@@ -197,6 +197,9 @@ Obj *selectObj(){
         char * buff=input();
         obj=getObjByName(buff);
         free(buff);
+	if(obj==NULL){
+		waddstr(wlog, "You don't find anything interesting. Choose something else.\n\n");
+	}
     }while(obj==NULL);
     return obj;
 }
